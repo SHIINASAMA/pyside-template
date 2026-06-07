@@ -32,7 +32,7 @@ class GithubUpdater(Updater):
         async with self.create_async_client() as client:
             r = await client.get(
                 url=f"{self.base_url}/repos/{self.project_name}/releases",
-                params={"pre_page": "100", "page": "1"},
+                params={"per_page": "100", "page": "1"},
                 follow_redirects=True
             )
             r.raise_for_status()

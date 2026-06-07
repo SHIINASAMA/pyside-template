@@ -32,7 +32,7 @@ def main(enable_updater: bool = True):
     # and do update logic
     updater = get_updater()
     # self-updating is not available on macOS
-    updater.is_enable = False if running_in_bundle else enable_updater
+    updater.is_enable = False if running_in_bundle() else enable_updater
 
     # override updater config
     config_file = paths.update_dir / "updater.json"

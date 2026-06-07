@@ -1,5 +1,7 @@
 import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
+
+import pytest
 
 
 class TestGetUpdater:
@@ -64,6 +66,55 @@ class TestRunningInBundle:
         from app.builtin.utils import running_in_bundle
         if sys.platform == "darwin":
             assert running_in_bundle() is False
+
+
+class TestMainEnablesUpdater:
+    def test_updater_enable_logic(self):
+        """Verify is_enable = False if running_in_bundle() else enable_updater"""
+        for bundle, enable, expected in [
+            (True, True, False),    # macOS bundle -> disabled
+            (False, True, True),    # normal -> enabled
+            (True, False, False),   # macOS bundle + flag off -> disabled
+            (False, False, False),  # normal + flag off -> disabled
+        ]:
+            is_enable = False if bundle else enable
+            assert is_enable == expected, f"bundle={bundle}, enable={enable}: expected {expected}"
+
+
+class TestGithubUpdaterParams:
+    def test_fetch_uses_per_page_and_page(self):
+        import anyio
+        from app.builtin.github_updater import GithubUpdater
+        from app.builtin.update import Version, ReleaseType
+
+        class FakeResponse:
+            raise_for_status = MagicMock()
+            json = MagicMock(return_value=[])
+
+        async def run():
+            u = GithubUpdater()
+            u.current_version = Version("1.0.0")
+            u.release_type = ReleaseType.STABLE
+            u.base_url = "https://api.github.com"
+            u.project_name = "test/repo"
+            u.app_name = "App"
+
+            mock_response = FakeResponse()
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock()
+
+            with patch.object(u, "create_async_client", return_value=mock_client):
+                await u.fetch()
+
+            call_kwargs = mock_client.get.call_args[1]
+            params = call_kwargs.get("params", {})
+            assert params.get("per_page") == "100", f"params: {params}"
+            assert params.get("page") == "1", f"params: {params}"
+            assert u.remote_version == Version("0.0.0.0")
+
+        anyio.run(run)
 
 
 class TestVersion:

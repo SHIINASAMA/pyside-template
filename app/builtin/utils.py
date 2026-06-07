@@ -5,9 +5,6 @@ import app.builtin.config as cfg
 import sys
 from pathlib import Path
 
-from qdarktheme import enable_hi_dpi
-from PySide6.QtWidgets import QApplication
-
 
 _updater_instance = None
 
@@ -44,6 +41,9 @@ def running_in_bundle() -> bool:
 
 
 def init_app():
+    from qdarktheme import enable_hi_dpi
+    from PySide6.QtWidgets import QApplication
+
     # enable hdpi
     enable_hi_dpi()
 

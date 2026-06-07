@@ -9,20 +9,30 @@ from qdarktheme import enable_hi_dpi
 from PySide6.QtWidgets import QApplication
 
 
+_updater_instance = None
+
+
 def get_updater():
+    global _updater_instance
+
     match cfg.UPDATER_REMOTE_TYPE:
         case "GitHub":
-            updater = GithubUpdater()
+            cls = GithubUpdater
         case "GitLab":
-            updater = GitlabUpdater()
+            cls = GitlabUpdater
         case _:
             raise ValueError(
                 f"Unsupported updater remote type: {cfg.UPDATER_REMOTE_TYPE}"
             )
-    updater.base_url = cfg.UPDATER_URL
-    updater.project_name = cfg.UPDATER_PROJECT_NAME
-    updater.app_name = cfg.UPDATER_APP_NAME
-    return updater
+
+    if _updater_instance is None or type(_updater_instance) is not cls:
+        _updater_instance = cls()
+
+    _updater_instance.base_url = cfg.UPDATER_URL
+    _updater_instance.project_name = cfg.UPDATER_PROJECT_NAME
+    _updater_instance.app_name = cfg.UPDATER_APP_NAME
+    _updater_instance.timeout = cfg.UPDATER_TIMEOUT
+    return _updater_instance
 
 
 def running_in_bundle() -> bool:

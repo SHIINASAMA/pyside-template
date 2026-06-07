@@ -1,19 +1,14 @@
 from glom import glom
 from httpx import AsyncClient
 
-from singleton_decorator import singleton
-
-
 from app.builtin.update import Updater, Version, get_arch, get_sysname
 from app.builtin.paths import AppPaths
 
 
-@singleton
 class GithubUpdater(Updater):
     base_url: str = "https://api.github.com"
     project_name: str = ""
     app_name: str = "App"
-    timeout = 5
     token = None
 
     _headers = None

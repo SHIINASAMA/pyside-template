@@ -4,18 +4,14 @@ from urllib.parse import urlparse
 from glom import glom
 from httpx import AsyncClient
 
-from singleton_decorator import singleton
-
 from app.builtin.update import Updater, Version, get_arch, get_sysname
 from app.builtin.paths import AppPaths
 
 
-@singleton
 class GitlabUpdater(Updater):
     base_url: str = "https://gitlab.com"
     project_name: str = ""
     app_name: str = "App"
-    timeout = 5
     token = None
 
     _headers = None

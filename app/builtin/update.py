@@ -79,6 +79,8 @@ class Version(BuiltinVersion):
 
 
 class Updater(ABC):
+    timeout: int = 30
+
     _copy_self_cmd = "--updater-copy-self"
     _updated_cmd = "--updater-updated"
     _disable_cmd = "--updater-disable"

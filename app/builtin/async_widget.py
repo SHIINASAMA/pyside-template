@@ -16,7 +16,7 @@ class AsyncWidget(QWidget):
         super().closeEvent(event)
 
     async def async_show(self):
-        future = asyncio.get_event_loop().create_future()
+        future = asyncio.get_running_loop().create_future()
 
         def resolve_future():
             if not future.done():

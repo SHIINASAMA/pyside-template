@@ -175,6 +175,13 @@ class Updater(ABC):
                 # Onedir
                 work_dir = new_executable_name
                 new_executable_name = new_executable_name / cfg.APP_NAME
+            elif new_executable_name.is_file():
+                # Onefile
+                pass
+            else:
+                raise FileNotFoundError(
+                    f"Cannot find update package at {new_executable_name}"
+                )
             subprocess.Popen(
                 [
                     new_executable_name,
@@ -230,6 +237,18 @@ class Updater(ABC):
             pass
 
         parent_dir = Path(old_dir)
+        # Validate parent_dir is within expected app data directory
+        try:
+            expected_base = AppPaths().base_dir.resolve()
+            parent_dir_resolved = parent_dir.resolve()
+            if not str(parent_dir_resolved).startswith(str(expected_base)):
+                raise RuntimeError(
+                    f"Refusing to operate on directory outside app data: {parent_dir}"
+                )
+        except RuntimeError:
+            raise
+        except Exception:
+            pass  # If resolution fails, proceed with original path
         current_dir = Path(os.getcwd())
         filelist = parent_dir / "filelist.txt"
         # delete files by ../filelist.txt if it exists, workdir is parent directory

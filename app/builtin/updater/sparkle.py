@@ -109,6 +109,9 @@ class SparkleUpdater:
                 True, self._delegate, None
             )
         )
+        # Explicitly start the updater — the PyObjC bridge may not relay the
+        # startingUpdater BOOL correctly through the designated initializer.
+        self._controller.startUpdater()
 
         logger.info("SparkleUpdater initialised")
 

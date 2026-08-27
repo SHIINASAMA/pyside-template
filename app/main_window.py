@@ -56,6 +56,7 @@ class MainWindow(QMainWindow):
             await self.check_update()
 
     async def check_update(self):
+        """Check for updates. Sparkle handles macOS updates natively."""
         # Sparkle handles updates natively — skip HTTP-based flow
         if get_sparkle_updater() is not None:
             return
@@ -66,11 +67,7 @@ class MainWindow(QMainWindow):
             try:
                 await updater.fetch()
                 if updater.check_for_update():
-                    # Headless E2E hook: auto-accept the update when requested
-                    # via APP_E2E_AUTO_UPDATE=1. Never enabled in production.
-                    if os.getenv("APP_E2E_AUTO_UPDATE") == "1":
-                        await self._perform_update(updater)
-                        return
+                    # Show update dialog and wait for user to accept
                     update_widget = UpdateWidget(self, updater)
                     await update_widget.async_show()
                     if update_widget.need_restart:

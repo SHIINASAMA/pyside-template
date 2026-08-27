@@ -109,6 +109,9 @@ def _patch_info_plist(
     info["SUFeedURL"] = appcast_url
     info["SUPublicEDKey"] = eddsa_public_key
     info["SUAllowsAutomaticUpdates"] = False
+    # Sparkle requires CFBundleVersion to be present and non-empty.
+    if "CFBundleVersion" not in info:
+        info["CFBundleVersion"] = info.get("CFBundleShortVersionString", "1")
 
     with open(plist_path, "wb") as f:
         plistlib.dump(info, f, sort_keys=True)

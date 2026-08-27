@@ -48,10 +48,12 @@ def main(enable_updater: bool = True):
                 logger.info("Using SparkleUpdater for macOS updates")
             else:
                 logger.info("SPARKLE_APPCAST_URL not set, falling back to HTTP updater")
-                updater.is_enable = False
+                # Keep the two-process HTTP updater enabled as a working fallback
+                # so a .app bundle can still self-update without a Sparkle appcast.
+                updater.is_enable = enable_updater
         except Exception:
             logger.info("Sparkle unavailable, falling back to HTTP updater")
-            updater.is_enable = False
+            updater.is_enable = enable_updater
     else:
         updater.is_enable = enable_updater
 

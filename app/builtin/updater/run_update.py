@@ -82,7 +82,9 @@ def replace_files(source: Path, target: Path) -> None:
 def launch_app(target: Path, launch_name: str) -> None:
     """Launch the new app executable."""
     if sys.platform == "darwin":
-        app_path = target / launch_name
+        # When updating a .app bundle, launch_name is "App.app" and target is
+        # the bundle directory itself, so the launchable path is one level up.
+        app_path = target.parent / launch_name if launch_name.endswith(".app") else target / launch_name
         subprocess.Popen(["open", str(app_path)])
     elif sys.platform == "win32":
         exe = target / f"{launch_name}.exe"

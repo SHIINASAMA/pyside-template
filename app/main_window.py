@@ -13,7 +13,8 @@ from qdarktheme import setup_theme
 
 import app.resources.resource  # type: ignore
 from app.builtin.update_widget import UpdateWidget
-from app.builtin.updater import get_updater, get_sparkle_updater
+from app.builtin.updater import get_updater, get_sparkle_updater, running_in_bundle
+import app.builtin.config as cfg
 from app.builtin.updater.downloader import fetch_checksum, download_with_checksum
 from app.builtin.updater.extractor import extract
 from app.resources.main_window_ui import Ui_MainWindow
@@ -65,6 +66,11 @@ class MainWindow(QMainWindow):
             try:
                 await updater.fetch()
                 if updater.check_for_update():
+                    # Headless E2E hook: auto-accept the update when requested
+                    # via APP_E2E_AUTO_UPDATE=1. Never enabled in production.
+                    if os.getenv("APP_E2E_AUTO_UPDATE") == "1":
+                        await self._perform_update(updater)
+                        return
                     update_widget = UpdateWidget(self, updater)
                     await update_widget.async_show()
                     if update_widget.need_restart:
@@ -116,26 +122,42 @@ class MainWindow(QMainWindow):
         # Extract
         extract(updater.filename, staging_dir)
 
-        # Find executable in staging
-        launch_name = self._find_launch_name(staging_dir)
-        if not launch_name:
-            QMessageBox.warning(
-                self, self.tr("Warning"), self.tr("Cannot find executable in update package"),
-            )
-            return
+        # The CI asset for a .app bundle is the whole App.app directory, so the
+        # staging tree contains App.app and the install target is the bundle
+        # itself (not its MacOS subfolder). For a standalone build the target
+        # is the directory holding the executable.
+        if running_in_bundle():
+            launch_name = self._find_launch_name(staging_dir) or f"{cfg.APP_NAME}.app"
+            source = staging_dir / launch_name
+            target = Path(sys.executable).parent.parent.parent
+        else:
+            launch_name = self._find_launch_name(staging_dir)
+            if not launch_name:
+                QMessageBox.warning(
+                    self, self.tr("Warning"), self.tr("Cannot find executable in update package"),
+                )
+                return
+            source = staging_dir
+            target = Path(sys.executable).parent
 
-        # Spawn updater mode
+        # Spawn updater mode as a detached process so it survives this app
+        # quitting, then let it replace files and relaunch.
         exe = sys.executable
         args = [
             exe, "--updater",
-            "--updater-source", str(staging_dir),
-            "--updater-target", str(Path(exe).parent),
+            "--updater-source", str(source),
+            "--updater-target", str(target),
             "--updater-launch", launch_name,
             "--updater-old-pid", str(os.getpid()),
             "--backup",
         ]
 
-        subprocess.Popen(args)
+        popen_kwargs = {}
+        if sys.platform == "win32":
+            popen_kwargs["creationflags"] = subprocess.DETACHED_PROCESS
+        else:
+            popen_kwargs["start_new_session"] = True
+        subprocess.Popen(args, **popen_kwargs)
         QApplication.quit()
 
     def _find_launch_name(self, staging_dir):

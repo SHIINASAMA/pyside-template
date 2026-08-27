@@ -46,6 +46,7 @@ jobs:
             name: macos
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     needs:
       - check-version
       - test
@@ -98,6 +99,10 @@ jobs:
           zip -r \
             ../release/${{ env.APP_NAME }}-${{ matrix.name }}-${{ matrix.arch }}-${{ github.ref_name }}.zip \
             ${{ env.APP_NAME }}.app/
+          cd ../release
+          for f in *.zip *.tar.gz *.dmg; do
+            [ -f "$f" ] && sha256sum "$f" > "$f.sha256"
+          done
 
       - name: Package artifact (Linux)
         if: runner.os == 'Linux'
@@ -108,6 +113,10 @@ jobs:
           zip -r \
             ../release/${{ env.APP_NAME }}-${{ matrix.name }}-${{ matrix.arch }}-${{ github.ref_name }}.zip \
             ${{ env.APP_NAME }}-${{ matrix.name }}-${{ matrix.arch }}/
+          cd ../release
+          for f in *.zip *.tar.gz *.dmg; do
+            [ -f "$f" ] && sha256sum "$f" > "$f.sha256"
+          done
 
       - name: Package artifact (Windows)
         if: runner.os == 'Windows'
@@ -117,13 +126,10 @@ jobs:
           New-Item -ItemType Directory -Path release
           Compress-Archive -Path ./build/${{ env.APP_NAME }}-${{ matrix.name }}-${{ matrix.arch }} `
             -DestinationPath ./release/${{ env.APP_NAME }}-${{ matrix.name }}-${{ matrix.arch }}-${{ github.ref_name }}.zip
-
-      - name: Generate checksums
-        run: |
           cd release
-          for f in *.zip *.tar.gz *.dmg; do
-            [ -f "$f" ] && sha256sum "$f" > "$f.sha256"
-          done
+          Get-ChildItem -Path . -Include *.zip,*.tar.gz,*.dmg | ForEach-Object {
+            (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLower() + "  " + $_.Name | Out-File -Encoding ascii ($_.FullName + ".sha256")
+          }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -164,13 +170,14 @@ jobs:
       - build_whl
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v4
         with:
           path: ./release
+          merge-multiple: true
       - uses: softprops/action-gh-release@v2
         if: github.ref_type == 'tag'
         with:
-          files: ./release/**
+          files: ./release/*
           name: Release ${{ github.ref_name }}
           body_path: CHANGE.md
           prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-dev') || contains(github.ref_name, '-nightly') }}

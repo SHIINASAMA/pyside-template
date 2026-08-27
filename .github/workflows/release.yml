@@ -100,8 +100,9 @@ jobs:
             ../release/${{ env.APP_NAME }}-${{ matrix.name }}-${{ matrix.arch }}-${{ github.ref_name }}.zip \
             ${{ env.APP_NAME }}.app/
           cd ../release
+          shopt -s nullglob
           for f in *.zip *.tar.gz *.dmg; do
-            [ -f "$f" ] && sha256sum "$f" > "$f.sha256"
+            sha256sum "$f" > "$f.sha256"
           done
 
       - name: Package artifact (Linux)
@@ -114,8 +115,9 @@ jobs:
             ../release/${{ env.APP_NAME }}-${{ matrix.name }}-${{ matrix.arch }}-${{ github.ref_name }}.zip \
             ${{ env.APP_NAME }}-${{ matrix.name }}-${{ matrix.arch }}/
           cd ../release
+          shopt -s nullglob
           for f in *.zip *.tar.gz *.dmg; do
-            [ -f "$f" ] && sha256sum "$f" > "$f.sha256"
+            sha256sum "$f" > "$f.sha256"
           done
 
       - name: Package artifact (Windows)

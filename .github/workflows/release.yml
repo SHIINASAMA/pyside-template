@@ -81,7 +81,7 @@ jobs:
           SPARKLE_APPCAST_URL: ${{ secrets.SPARKLE_APPCAST_URL }}
           SPARKLE_EDDSA_PUBLIC_KEY: ${{ secrets.SPARKLE_EDDSA_PUBLIC_KEY }}
         run: |
-          python scripts/embed_sparkle.py \
+          uv run python scripts/embed_sparkle.py \
             --app-bundle-path build/${{ env.APP_NAME }}.app \
             --sparkle-version 2.9.6 \
             --appcast-url "$SPARKLE_APPCAST_URL" \

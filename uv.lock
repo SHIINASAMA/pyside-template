@@ -2947,6 +2947,12 @@ dependencies = [
     { name = "singleton-decorator" },
 ]
 
+[package.optional-dependencies]
+macos-sparkle = [
+    { name = "pyobjc-core" },
+    { name = "pyobjc-framework-cocoa" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "nuitka" },
@@ -2964,12 +2970,15 @@ requires-dist = [
     { name = "packaging", specifier = ">=25.0" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "pyobjc", marker = "sys_platform == 'darwin'" },
+    { name = "pyobjc-core", marker = "extra == 'macos-sparkle'", specifier = ">=10.0" },
+    { name = "pyobjc-framework-cocoa", marker = "extra == 'macos-sparkle'", specifier = ">=10.0" },
     { name = "pyqtdarktheme-fork", specifier = ">=2.3.4" },
     { name = "pyside6", specifier = ">=6.1.3" },
     { name = "qasync", specifier = ">=0.28.0" },
     { name = "ruff", specifier = ">=0.15.2" },
     { name = "singleton-decorator", specifier = ">=1.0.0" },
 ]
+provides-extras = ["macos-sparkle"]
 
 [package.metadata.requires-dev]
 dev = [

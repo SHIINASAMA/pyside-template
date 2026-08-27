@@ -72,8 +72,20 @@ jobs:
       - name: Setup, install dependencies, build (macOS)
         if: runner.os == 'macOS'
         run: |
-          uv sync
+          uv sync --extra macos-sparkle
           uv run pyside-cli build
+
+      - name: Embed Sparkle.framework (macOS)
+        if: runner.os == 'macOS'
+        env:
+          SPARKLE_APPCAST_URL: ${{ secrets.SPARKLE_APPCAST_URL }}
+          SPARKLE_EDDSA_PUBLIC_KEY: ${{ secrets.SPARKLE_EDDSA_PUBLIC_KEY }}
+        run: |
+          python scripts/embed_sparkle.py \
+            --app-bundle-path build/${{ env.APP_NAME }}.app \
+            --sparkle-version 2.9.6 \
+            --appcast-url "$SPARKLE_APPCAST_URL" \
+            --eddsa-public-key "$SPARKLE_EDDSA_PUBLIC_KEY"
 
       - name: Package artifact (macOS)
         if: runner.os == 'macOS'

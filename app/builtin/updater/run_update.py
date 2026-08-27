@@ -72,7 +72,7 @@ def replace_files(source: Path, target: Path) -> None:
     """Replace target directory contents with source using platform tool."""
     if sys.platform == "darwin" or sys.platform == "linux":
         subprocess.run(
-            ["rsync", "-a", "--delete", f"{source}/", f"{target}/"],
+            ["rsync", "-a", "--delete", "--checksum", f"{source}/", f"{target}/"],
             check=True,
         )
     else:
@@ -150,3 +150,7 @@ def run_updater_mode() -> None:
 
     log.info("Update complete")
     sys.exit(0)
+
+
+if __name__ == "__main__":
+    run_updater_mode()

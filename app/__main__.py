@@ -1,3 +1,4 @@
+import logging
 import asyncio
 import sys
 import os
@@ -8,8 +9,11 @@ from qasync import QApplication, run
 from app.builtin.locale import detect_system_ui_language
 from app.builtin.utils import init_app
 from app.builtin.updater import get_updater, running_in_bundle
+from app.builtin.updater import set_sparkle_updater
 from app.builtin.paths import AppPaths
 from app.main_window import MainWindow
+
+logger = logging.getLogger(__name__)
 
 
 async def task():
@@ -32,8 +36,24 @@ def main(enable_updater: bool = True):
     # init updater, updater will remove some arguments
     # and do update logic
     updater = get_updater()
-    # self-updating is not available on macOS
-    updater.is_enable = False if running_in_bundle() else enable_updater
+
+    if running_in_bundle():
+        # macOS .app bundle — try Sparkle first
+        try:
+            from app.builtin.updater.sparkle import SparkleUpdater
+            import app.builtin.config as cfg
+            if cfg.SPARKLE_APPCAST_URL:
+                sparkle = SparkleUpdater()
+                set_sparkle_updater(sparkle)
+                logger.info("Using SparkleUpdater for macOS updates")
+            else:
+                logger.info("SPARKLE_APPCAST_URL not set, falling back to HTTP updater")
+                updater.is_enable = False
+        except Exception:
+            logger.info("Sparkle unavailable, falling back to HTTP updater")
+            updater.is_enable = False
+    else:
+        updater.is_enable = enable_updater
 
     # override updater config
     config_file = paths.update_dir / "updater.json"

@@ -16,6 +16,12 @@ dependencies = [
     "ruff>=0.15.2",
 ]
 
+[project.optional-dependencies]
+macos-sparkle = [
+    "pyobjc-core>=10.0",
+    "pyobjc-framework-Cocoa>=10.0",
+]
+
 [dependency-groups]
 dev = [
     "nuitka>=2.8.1",

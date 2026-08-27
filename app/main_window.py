@@ -1,3 +1,4 @@
+import sys
 import asyncio
 import os
 
@@ -12,7 +13,7 @@ from qdarktheme import setup_theme
 
 import app.resources.resource  # type: ignore
 from app.builtin.update_widget import UpdateWidget
-from app.builtin.updater import get_updater
+from app.builtin.updater import get_updater, get_sparkle_updater
 from app.builtin.updater.downloader import fetch_checksum, download_with_checksum
 from app.builtin.updater.extractor import extract
 from app.resources.main_window_ui import Ui_MainWindow
@@ -36,6 +37,15 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self.tr("MainWindow"))
         self.setWindowIcon(QIcon(":/logo.png"))
 
+        # Add macOS "Check for Updates..." menu item when Sparkle is active
+        if get_sparkle_updater() is not None and sys.platform == "darwin":
+            menu_bar = self.menuBar()
+            app_menu = menu_bar.actions()[0].menu() if menu_bar.actions() else menu_bar.addMenu(self.tr("App"))
+            if app_menu is None:
+                app_menu = menu_bar.addMenu(self.tr("App"))
+            update_action = app_menu.addAction(self.tr("Check for Updates..."))
+            update_action.triggered.connect(lambda: get_sparkle_updater().check_for_updates())
+
     async def async_init(self):
         if os.getenv("DEBUG", "0") == "1":
             # Debug mode
@@ -45,6 +55,9 @@ class MainWindow(QMainWindow):
             await self.check_update()
 
     async def check_update(self):
+        # Sparkle handles updates natively — skip HTTP-based flow
+        if get_sparkle_updater() is not None:
+            return
         updater = get_updater()
         if not updater.is_enable:
             return

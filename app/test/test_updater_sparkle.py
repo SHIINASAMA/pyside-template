@@ -15,7 +15,7 @@ def _make_spu_class(mock_controller: MagicMock) -> MagicMock:
     """Return a mock SPUStandardUpdaterController class whose
     ``alloc().init()`` returns *mock_controller*."""
     spu_cls = MagicMock(name="SPUStandardUpdaterController")
-    spu_cls.alloc.return_value.init.return_value = mock_controller
+    spu_cls.alloc.return_value.initWithStartingUpdater_updaterDelegate_userDriverDelegate_.return_value = mock_controller
     return spu_cls
 
 

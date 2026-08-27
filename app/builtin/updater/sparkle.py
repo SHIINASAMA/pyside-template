@@ -102,8 +102,13 @@ class SparkleUpdater:
         from AppKit import SPUStandardUpdaterController  # noqa: F811
 
         self._delegate = _SparkleDelegate()
-        self._controller = SPUStandardUpdaterController.alloc().init()
-        self._controller.setDelegate_(self._delegate)
+        # Pass delegate via designated initializer (not setDelegate_ — SPUUpdater has no such method).
+        self._controller = (
+            SPUStandardUpdaterController.alloc()
+            .initWithStartingUpdater_updaterDelegate_userDriverDelegate_(
+                True, self._delegate, None
+            )
+        )
 
         logger.info("SparkleUpdater initialised")
 

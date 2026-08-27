@@ -106,6 +106,13 @@ jobs:
           Compress-Archive -Path ./build/${{ env.APP_NAME }}-${{ matrix.name }}-${{ matrix.arch }} `
             -DestinationPath ./release/${{ env.APP_NAME }}-${{ matrix.name }}-${{ matrix.arch }}-${{ github.ref_name }}.zip
 
+      - name: Generate checksums
+        run: |
+          cd release
+          for f in *.zip *.tar.gz *.dmg; do
+            [ -f "$f" ] && sha256sum "$f" > "$f.sha256"
+          done
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

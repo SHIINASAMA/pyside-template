@@ -6,7 +6,8 @@ from PySide6.QtCore import QTranslator, QLockFile
 from qasync import QApplication, run
 
 from app.builtin.locale import detect_system_ui_language
-from app.builtin.utils import get_updater, init_app, running_in_bundle
+from app.builtin.utils import init_app
+from app.builtin.updater import get_updater, running_in_bundle
 from app.builtin.paths import AppPaths
 from app.main_window import MainWindow
 

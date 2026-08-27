@@ -135,14 +135,16 @@ def run_updater_mode() -> None:
             shutil.copytree(backup_dir, args.target)
         sys.exit(1)
 
-    # Step 4: Launch new app
+    # Step 4: Launch new app (cleanup runs regardless)
     log.info("Launching new app: %s/%s", args.target, args.launch)
-    launch_app(args.target, args.launch)
-
-    # Step 5: Cleanup
-    cleanup(args.source)
-    if backup_dir and backup_dir.exists():
-        shutil.rmtree(backup_dir, ignore_errors=True)
+    try:
+        launch_app(args.target, args.launch)
+    except Exception:
+        log.warning("Failed to launch new app, continuing with cleanup")
+    finally:
+        cleanup(args.source)
+        if backup_dir and backup_dir.exists():
+            shutil.rmtree(backup_dir, ignore_errors=True)
 
     log.info("Update complete")
     sys.exit(0)

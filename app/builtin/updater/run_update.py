@@ -71,12 +71,8 @@ def wait_for_process_exit(pid: int, timeout: int = 30) -> None:
 def replace_files(source: Path, target: Path) -> None:
     """Replace target directory contents with source using platform tool."""
     if sys.platform == "darwin" or sys.platform == "linux":
-        subprocess.run(
-            ["rsync", "-a", "--delete", "--checksum", f"{source}/", f"{target}/"],
-            check=True,
-        )
+        _copy_tree(source, target)
     else:
-        # Windows
         subprocess.run(
             ["robocopy", str(source), str(target), "/MIR", "/R:3", "/W:5"],
             check=True,
@@ -154,3 +150,19 @@ def run_updater_mode() -> None:
 
 if __name__ == "__main__":
     run_updater_mode()
+def _copy_tree(source: Path, target: Path) -> None:
+    """Pure-Python: replace target contents with source contents."""
+    for item in source.iterdir():
+        dest = target / item.name
+        if item.is_dir():
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.copytree(item, dest)
+        else:
+            shutil.copy2(item, dest)
+    for item in target.iterdir():
+        if item.name not in {e.name for e in source.iterdir()}:
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()

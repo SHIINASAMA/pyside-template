@@ -106,10 +106,21 @@ Type your configuration in `updater.json`:
 The `version` field will not be automatically updated; it is only used to manually set or override the current version.
 This is typically used for testing purposes.
 
+## macOS Sparkle Codesign Secrets
+
+CI 正式签名需要以下 GitHub Secrets（未配置时自动 ad-hoc，仅本地 E2E）：
+
+| Secret | 说明 |
+|---|---|
+| `APPLE_CERTIFICATE_P12_BASE64` | `base64` 后的 Developer ID Application 证书 p12 |
+| `APPLE_CERTIFICATE_PASSWORD` | p12 密码 |
+| `SPARKLE_APPCAST_URL` / `SPARKLE_EDDSA_PUBLIC_KEY` | appcast 地址与 EdDSA 公钥（`embed_sparkle.py` 用） |
+| `APPLE_ID` + `APPLE_APP_SPECIFIC_PASSWORD` + `APPLE_TEAM_ID` 或 `APPLE_API_KEY` + `APPLE_API_ISSUER` | `notarytool` 公证（二选一） |
+
 ## References
 
-- Version parsing and update logic: `app/builtin/updater.py`, `app/builtin/*_updater.py`
-
+- Version parsing and update logic: `app/builtin/updater/base.py`, `app/builtin/updater/*`
+- macOS Sparkle: `app/builtin/updater/sparkle.py`, `scripts/embed_sparkle.py`, `scripts/codesign_macos.py`, `scripts/notarize_macos.py`, `scripts/entitlements.plist`
 - CI/CD release scripts: 
   - `.gitlab-ci.yml`
   - `.github/workflow/release.yml`

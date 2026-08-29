@@ -88,6 +88,46 @@ jobs:
             --appcast-url "$SPARKLE_APPCAST_URL" \
             --eddsa-public-key "$SPARKLE_EDDSA_PUBLIC_KEY"
 
+      - name: Codesign (macOS)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # Import certificate if provided, otherwise ad-hoc sign
+          if [ -n "$APPLE_CERTIFICATE_P12_BASE64" ]; then
+            echo "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > /tmp/cert.p12
+            security create-keychain -p actions build.keychain || true
+            security default-keychain -s build.keychain
+            security unlock-keychain -p actions build.keychain
+            security import /tmp/cert.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
+            IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep -oE '".*"' | head -n1 | tr -d '"')
+            echo "Using identity: $IDENTITY"
+            uv run python scripts/codesign_macos.py --app-bundle build/${{ env.APP_NAME }}.app --identity "$IDENTITY" --entitlements scripts/entitlements.plist --verbose
+          else
+            echo "⚠️  No certificate secret — ad-hoc signing for local Sparkle E2E (Gatekeeper will still reject)"
+            uv run python scripts/codesign_macos.py --app-bundle build/${{ env.APP_NAME }}.app --verbose
+          fi
+
+      - name: Notarize (macOS)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          # .app notarization requires --bundle; dmg notarization happens after packaging
+          if [ -n "$APPLE_ID" ] || [ -n "$APPLE_API_KEY" ]; then
+            uv run python scripts/notarize_macos.py --bundle build/${{ env.APP_NAME }}.app --wait
+          else
+            echo "⚠️  Notarization credentials not set — skipping (add APPLE_ID / APPLE_API_KEY to enable)"
+          fi
+
       - name: Package artifact (macOS)
         if: runner.os == 'macOS'
         run: |

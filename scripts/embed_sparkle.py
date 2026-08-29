@@ -81,7 +81,7 @@ def _copy_framework(extracted_dir: Path, frameworks_dir: Path) -> None:
     if dst.exists():
         shutil.rmtree(dst)
 
-    shutil.copytree(src, dst)
+    shutil.copytree(src, dst, symlinks=True)
     print(f"  Copied framework to {dst}")
 
 

@@ -145,6 +145,27 @@ jobs:
             sha256sum "$f" > "$f.sha256"
           done
 
+      - name: Generate Signed Appcast (macOS)
+        if: runner.os == 'macOS'
+        env:
+          SPARKLE_ED25519_PRIVATE_KEY: ${{ secrets.SPARKLE_ED25519_PRIVATE_KEY }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          # Sparkle 用 macOS 的 .app 更新包（dmg）生成签名 appcast.xml
+          mkdir -p release/appcast-src
+          # 优先用 release 里的 dmg；若存在 zip 含 .app 也取其一
+          cp release/${{ env.APP_NAME }}Installer.dmg release/appcast-src/ 2>/dev/null || cp build/${{ env.APP_NAME }}Installer.dmg release/appcast-src/ 2>/dev/null || true
+          # 仅当私钥 secret 已配置时才生成；否则跳过（本地开发可手动生成）
+          if [ -n "$SPARKLE_ED25519_PRIVATE_KEY" ]; then
+            SPARKLE_APPCAST_BASE_URL="https://github.com/${{ github.repository }}/releases/download" \
+            SPARKLE_PRIVATE_KEY="$SPARKLE_ED25519_PRIVATE_KEY" \
+              bash scripts/generate_appcast.sh release/appcast-src "${{ env.APP_NAME }}" "${{ github.ref_name }}" "$RELEASE_TAG"
+            cp release/appcast-src/appcast.xml release/ 2>/dev/null || true
+            echo "appcast.xml 已生成并加入 release 目录"
+          else
+            echo "⚠️  SPARKLE_ED25519_PRIVATE_KEY 未配置，跳过 appcast 生成（本地可用 generate_appcast.sh 手动生成）"
+          fi
+
       - name: Package artifact (Linux)
         if: runner.os == 'Linux'
         run: |

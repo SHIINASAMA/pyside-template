@@ -94,3 +94,13 @@ venv.bak/
 
 # Cython debug symbols
 cython_debug/
+
+# Sparkle EdDSA private key — NEVER commit (local only)
+*.pem
+*.key
+ed25519*
+sparkle_private*
+
+# Sparkle tools cache (downloaded at build time)
+scripts/tools/
+.pyside-template-sparkle-tools/

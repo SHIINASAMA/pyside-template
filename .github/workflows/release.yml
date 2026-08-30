@@ -111,29 +111,20 @@ jobs:
             uv run python scripts/codesign_macos.py --app-bundle build/${{ env.APP_NAME }}.app --verbose
           fi
 
-      - name: Notarize (macOS)
-        if: runner.os == 'macOS'
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-        run: |
-          # .app notarization requires --bundle; dmg notarization happens after packaging
-          if [ -n "$APPLE_ID" ] || [ -n "$APPLE_API_KEY" ]; then
-            uv run python scripts/notarize_macos.py --bundle build/${{ env.APP_NAME }}.app --wait
-          else
-            echo "⚠️  Notarization credentials not set — skipping (add APPLE_ID / APPLE_API_KEY to enable)"
-          fi
-
       - name: Package artifact (macOS)
         if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
           brew install create-dmg
           xattr -cr build/${{ env.APP_NAME }}.app
           ./build-dmg.sh
+          # Sign the DMG itself (wifi-lens: codesign --sign --timestamp --options=runtime)
+          if [ -n "$APPLE_CERTIFICATE_P12_BASE64" ]; then
+            IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep -oE '".*"' | head -n1 | tr -d '"')
+            codesign --force --sign "$IDENTITY" --timestamp --options=runtime "release/${{ env.APP_NAME }}Installer.dmg"
+          fi
           mkdir -p release
           cd build
           zip -r \
@@ -144,6 +135,23 @@ jobs:
           for f in *.zip *.tar.gz *.dmg; do
             sha256sum "$f" > "$f.sha256"
           done
+
+      - name: Notarize (macOS)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          # 公证整个 dmg（与 wifi-lens 一致），而非临时 zip
+          if [ -n "$APPLE_ID" ] || [ -n "$APPLE_API_KEY" ]; then
+            uv run python scripts/notarize_macos.py --dmg release/${{ env.APP_NAME }}Installer.dmg --wait
+          else
+            echo "⚠️  Notarization credentials not set — skipping (add APPLE_ID / APPLE_API_KEY to enable)"
+          fi
 
       - name: Generate Signed Appcast (macOS)
         if: runner.os == 'macOS'

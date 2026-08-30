@@ -115,13 +115,18 @@ def _find_macho_binaries(app_bundle: Path) -> list[Path]:
     for p in (app_bundle / "Contents" / "MacOS").rglob("*"):
         if p.is_file() and _is_macho(p) and p not in candidates:
             candidates.append(p)
-    # Also Sparkle binaries that are not inside a bundle's MacOS (e.g. Versions/B/Sparkle, Autoupdate)
-    for p in app_bundle.rglob("Sparkle"):
-        if p.is_file() and _is_macho(p) and p not in candidates:
-            candidates.append(p)
-    for p in app_bundle.rglob("Autoupdate"):
-        if p.is_file() and _is_macho(p) and p not in candidates:
-            candidates.append(p)
+    # Sparkle framework binaries: Versions/Current/Sparkle and Autoupdate are
+    # symlinks to Versions/B/*. Sign the REAL Mach-O files so codesign does not
+    # report "unsealed contents present in the root directory of an embedded
+    # framework" when signing the .framework.
+    for name in ("Sparkle", "Autoupdate"):
+        for p in app_bundle.rglob(name):
+            try:
+                real = p.resolve()
+            except Exception:
+                continue
+            if real.is_file() and _is_macho(real) and real not in candidates:
+                candidates.append(real)
     return sorted(set(candidates))
 
 def _codesign_path(path: Path, identity: str, entitlements: Path | None, *, verbose: bool) -> None:
@@ -220,6 +225,27 @@ def main(argv: list[str] | None = None) -> None:
             if entitlements and m.name == "App":
                 cmd += ["--entitlements", str(entitlements)]
             cmd.append(str(m))
+            _run(cmd, verbose=args.verbose)
+
+    # 3b. Sign framework-internal Mach-O binaries (Versions/B/Sparkle, Autoupdate)
+    # BEFORE signing the .framework, otherwise codesign reports
+    # "unsealed contents present in the root directory of an embedded framework".
+    # Only need the REAL path (under Versions/B). Drop the top-level symlink
+    # duplicates (e.g. Sparkle.framework/Sparkle -> Versions/Current/Sparkle).
+    framework_bins = []
+    seen_bin: set[str] = set()
+    for m in machos:
+        s = str(m)
+        if "Frameworks" in s and m.name in ("Sparkle", "Autoupdate")            and "XPCServices" not in s and "Updater.app" not in s:
+            real = str(m.resolve()) if m.is_symlink() else str(m)
+            if real not in seen_bin:
+                seen_bin.add(real)
+                framework_bins.append(m)
+    if framework_bins:
+        print(f"\nSigning {len(framework_bins)} framework-internal binary(ies):")
+        for m in sorted(set(framework_bins)):
+            print(f"  - {os.path.relpath(m, app_bundle)}")
+            cmd = ["codesign", "--force", "--sign", identity, "--options", "runtime", "--timestamp", str(m)]
             _run(cmd, verbose=args.verbose)
 
     # 4. Finally sign the outer .app bundle (with entitlements if provided)

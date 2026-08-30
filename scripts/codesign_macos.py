@@ -32,6 +32,7 @@ Requires macOS with ``codesign`` / ``codesign --verify``.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -82,8 +83,11 @@ def _find_nested_bundles(app_bundle: Path) -> list[Path]:
             if fw not in bundles:
                 bundles.append(fw)
 
-    # De-duplicate while preserving order, and ensure inside-out:
-    # XPCs -> Updater.app -> Frameworks
+    # De-duplicate and resolve symlinks to REAL paths.
+    # codesign cannot sign through Sparkle's top-level symlinks (XPCServices,
+    # Updater.app, Sparkle, Autoupdate -> Versions/Current/...); it reports
+    # "bundle format unrecognized, invalid, or unsuitable". Always sign the
+    # resolved real path (e.g. .../Versions/B/XPCServices/Downloader.xpc).
     seen: set[str] = set()
     ordered: list[Path] = []
     for b in bundles:
@@ -91,12 +95,11 @@ def _find_nested_bundles(app_bundle: Path) -> list[Path]:
             real = str(b.resolve())
         except Exception:
             real = str(b)
-        key = real
-        if key not in seen:
-            seen.add(key)
-            ordered.append(b)
+        if real not in seen:
+            seen.add(real)
+            ordered.append(b.resolve() if b.is_symlink() else b)
 
-    # Sort by depth descending (deeper first)
+    # Sort by depth descending (deeper first) so inner bundles are signed first.
     ordered.sort(key=lambda p: len(p.parts), reverse=True)
     return ordered
 
@@ -135,9 +138,16 @@ def _codesign_path(path: Path, identity: str, entitlements: Path | None, *, verb
 def _verify(app_bundle: Path, identity: str = "-", verbose: bool = True) -> None:
     print("\nVerifying signatures...")
     _run(["codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app_bundle)], verbose=verbose)
-    # spctl rejects ad-hoc signatures — only verify Gatekeeper for real Developer ID
+    # spctl (Gatekeeper) only passes AFTER notarization and for a fully-formed
+    # distributable .app. At codesign time the bundle isn't notarized yet, so
+    # spctl is expected to fail. Treat it as a warning, not a hard error —
+    # the meaningful check is `codesign --verify --strict` above.
     if identity != "-":
-        _run(["spctl", "--assess", "--type", "execute", "--verbose", str(app_bundle)], verbose=verbose)
+        try:
+            _run(["spctl", "--assess", "--type", "execute", "--verbose", str(app_bundle)], verbose=verbose)
+        except subprocess.CalledProcessError as e:
+            print("⚠️  spctl did not pass yet — expected before notarization "
+                  f"(Gatekeeper needs a notarized, properly-formed bundle). stderr: {e.stderr}")
     else:
         print("(skipping spctl for ad-hoc signing — Gatekeeper will reject ad-hoc, expected)")
     print("✅ Verification passed (strict)")
@@ -184,12 +194,12 @@ def main(argv: list[str] | None = None) -> None:
     if nested:
         print(f"\nFound {len(nested)} nested bundle(s) to sign inside-out:")
         for b in nested:
-            print(f"  - {b.relative_to(app_bundle)}")
+            print(f"  - {os.path.relpath(b, app_bundle)}")
 
         for bundle in nested:
             # For frameworks/XPCs, sign without custom entitlements
             # For the main Sparkle binaries, sign the Mach-O inside first if needed
-            print(f"\nSigning bundle: {bundle.relative_to(app_bundle)}")
+            print(f"\nSigning bundle: {os.path.relpath(bundle, app_bundle)}")
             cmd = ["codesign", "--force", "--sign", identity, "--options", "runtime", "--timestamp", str(bundle)]
             _run(cmd, verbose=args.verbose)
     else:
@@ -204,7 +214,7 @@ def main(argv: list[str] | None = None) -> None:
     if loose:
         print(f"\nSigning {len(loose)} Mach-O binary(ies) in Contents/MacOS:")
         for m in loose:
-            print(f"  - {m.relative_to(app_bundle)}")
+            print(f"  - {os.path.relpath(m, app_bundle)}")
             # Main executable gets entitlements + hardened runtime
             cmd = ["codesign", "--force", "--sign", identity, "--options", "runtime", "--timestamp"]
             if entitlements and m.name == "App":

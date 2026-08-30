@@ -7,6 +7,15 @@ on:
       # The pattern must be: ([0-9]+(\.[0-9]+){1,3})(-(stable|alpha|beta|nightly|dev))?$
       - "*"
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Which platforms to build for manual smoke tests."
+        required: false
+        default: "macos"
+        type: choice
+        options:
+          - macos
+          - all
 
 permissions:
   contents: write
@@ -38,14 +47,18 @@ jobs:
           - os: ubuntu-latest
             arch: x64
             name: linux
+            enable: ${{ github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' }}
           - os: windows-latest
             arch: x64
             name: windows
+            enable: ${{ github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' }}
           - os: macos-latest
             arch: arm64
             name: macos
+            enable: true
 
     runs-on: ${{ matrix.os }}
+    if: matrix.enable != false
     timeout-minutes: 90
     needs:
       - check-version

@@ -81,38 +81,37 @@ If you require:
 
 You must use **PyInstaller** as the build backend.
 
-## Self-Update (macOS)
+## Self-Update (macOS) — NOT WORKING
 
-### Sparkle via PyObjC
+> **STATUS: ABANDONED.** Apple notarization rejects the Nuitka-built app. See
+> `docs/macos-notarization-finding.md` for the root-cause analysis and
+> recommended alternative (py2app / PyInstaller bundle mode).
 
-macOS 更新走 **Sparkle 2.x**（通过 PyObjC 桥接 `SPUStandardUpdaterController`）：
+The current install does not provide a working self-update mechanism on macOS.
 
-- 构建后需嵌入 `Sparkle.framework`：`python scripts/embed_sparkle.py --app-bundle-path build/App.app --sparkle-version 2.9.6 --appcast-url <URL> --eddsa-public-key <KEY>`
-- 应用启动时自动尝试 `SparkleUpdater`，失败回退到 HTTP 两进程更新器
-- 菜单栏 `Check for Updates...` 触发 `checkForUpdates_`
+The following Sparkle integration code exists but is **not end-to-end verified
+because Apple notarization rejects the Nuitka `.app`** (libraries are placed under
+`Contents/MacOS` instead of `Contents/Frameworks`).
 
-### Codesign / Notarization
+### Sparkle integration (reference)
 
-Nuitka 打出的 `.app` + `Sparkle.framework` 存在嵌套 bundle，**不能**用 `codesign --deep` 或 `--no-strict`：
+- Embed the framework: `python scripts/embed_sparkle.py --app-bundle-path build/App.app --sparkle-version 2.9.6 --appcast-url <URL> --eddsa-public-key <KEY>`
+- App startup tries `SparkleUpdater`, falls back to the HTTP two-process updater
+- Menu bar `Check for Updates...` triggers `checkForUpdates_`
 
-| 错误做法 | 后果 |
+### Signing / notarization notes
+
+`codesign --deep` / `--no-strict` will NOT work for the embedded `Sparkle.framework`:
+
+| Anti-pattern | Result |
 |---|---|
-| `codesign --deep` | 隐藏问题但 `codesign --verify --strict` 失败，Sparkle installer 拒绝 |
-| `codesign --no-strict` | 绕过 `bundle format is ambiguous` 但签名被 Sparkle 判为 corrupted |
+| `codesign --deep` | Hides the issue; `codesign --verify --strict` fails; Sparkle installer rejects |
+| `codesign --no-strict` | Bypasses `bundle format is ambiguous` but the signature is judged corrupted by Sparkle |
 
-**正确做法：inside-out 显式签名（已封装为脚本）**
+Correct approach is inside-out explicit signing (already in `scripts/codesign_macos.py`).
 
-```bash
-# 本地 ad-hoc（可跑通 Sparkle E2E 的下载/版本比较，但 Gatekeeper 仍会拦截）
-python scripts/codesign_macos.py --app-bundle build/App.app --verbose
+Order (handled by the script): `XPCServices/*.xpc` -> `Updater.app` -> `Sparkle`/`Autoupdate` binaries -> `Sparkle.framework` -> loose Mach-O (`Contents/MacOS/*`) -> outer `App.app` (with `scripts/entitlements.plist` + `--options runtime --timestamp`).
 
-# 发版签名（需 Developer ID）
-python scripts/codesign_macos.py --app-bundle build/App.app --identity "Developer ID Application: Your Team (TEAMID)" --entitlements scripts/entitlements.plist
-python scripts/notarize_macos.py --bundle build/App.app --wait  # 需 APPLE_ID / APPLE_API_KEY
-```
+CI integration exists in `.github/workflows/release.yml` (`Codesign (macOS)` + `Notarize (macOS)`), but the notarization step fails for the Nuitka bundle.
 
-签名顺序（脚本已自动处理）：`XPCServices/*.xpc` → `Updater.app` → `Autoupdate` / `Sparkle` 二进制 → `Sparkle.framework` →  loose Mach-O (`Contents/MacOS/*`) → 外层 `App.app`（带 `scripts/entitlements.plist` + `--options runtime --timestamp`）
-
-CI 已集成：`.github/workflows/release.yml` 的 `Codesign (macOS)` + `Notarize (macOS)` 两步。未配置证书时自动降级为 ad-hoc；配置 `APPLE_CERTIFICATE_P12_BASE64` 等 secrets 后自动走正式签名 + 公证。详见 `scripts/codesign_macos.py` 注释。
-
-常见问题详见 Obsidian `技术/PySide与打包/pyside-template-Sparkle踩坑.md`。
+See `docs/macos-notarization-finding.md` for details.

@@ -149,7 +149,7 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
-          # 公证整个 dmg（与 wifi-lens 一致），而非临时 zip
+          # Notarize the DMG (matching wifi-lens), not a temp zip
           if [ -n "$APPLE_ID" ] || [ -n "$APPLE_API_KEY" ]; then
             uv run python scripts/notarize_macos.py --dmg release/${{ env.APP_NAME }}Installer.dmg --wait
           else
@@ -162,19 +162,19 @@ jobs:
           SPARKLE_ED25519_PRIVATE_KEY: ${{ secrets.SPARKLE_ED25519_PRIVATE_KEY }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          # Sparkle 用 macOS 的 .app 更新包（dmg）生成签名 appcast.xml
+          # Sparkle generates a signed appcast.xml from the macOS .app update (dmg)
           mkdir -p release/appcast-src
-          # 优先用 release 里的 dmg；若存在 zip 含 .app 也取其一
+          # Prefer the dmg in release/; fall back to a zip containing a .app if present
           cp release/${{ env.APP_NAME }}Installer.dmg release/appcast-src/ 2>/dev/null || cp build/${{ env.APP_NAME }}Installer.dmg release/appcast-src/ 2>/dev/null || true
-          # 仅当私钥 secret 已配置时才生成；否则跳过（本地开发可手动生成）
+          # Only generate when the private-key secret is set; otherwise skip (dev can run generate_appcast.sh manually)
           if [ -n "$SPARKLE_ED25519_PRIVATE_KEY" ]; then
             SPARKLE_APPCAST_BASE_URL="https://github.com/${{ github.repository }}/releases/download" \
             SPARKLE_PRIVATE_KEY="$SPARKLE_ED25519_PRIVATE_KEY" \
               bash scripts/generate_appcast.sh release/appcast-src "${{ env.APP_NAME }}" "${{ github.ref_name }}" "$RELEASE_TAG"
             cp release/appcast-src/appcast.xml release/ 2>/dev/null || true
-            echo "appcast.xml 已生成并加入 release 目录"
+            echo "appcast.xml generated and added to release dir"
           else
-            echo "⚠️  SPARKLE_ED25519_PRIVATE_KEY 未配置，跳过 appcast 生成（本地可用 generate_appcast.sh 手动生成）"
+            echo "SPARKLE_ED25519_PRIVATE_KEY not set; skipping appcast generation (run generate_appcast.sh manually for local dev)"
           fi
 
       - name: Package artifact (Linux)

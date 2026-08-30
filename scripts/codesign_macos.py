@@ -1,7 +1,7 @@
 """Codesign a Nuitka-built .app bundle + embedded Sparkle.framework.
 
 Resolves the `bundle format is ambiguous` / `--no-strict` deadlock
-documented in `技术/PySide与打包/pyside-template-Sparkle踩坑.md`:
+documented in `docs/macos-notarization-finding.md`:
 
 * Sparkle.framework contains nested bundles (Updater.app, XPCServices/*.xpc)
   which require inside-out signing — inner bundles first, outer framework

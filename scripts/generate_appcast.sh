@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# 生成 Sparkle 2 appcast.xml 并 EdDSA 签名（参考 wifi-lens .github/workflows/release.yml）。
+# Generate Sparkle 2 appcast.xml with EdDSA signing (ref: wifi-lens release.yml).
 #
-# 用法:
-#   scripts/generate_appcast.sh <更新包目录> <app名称> <版本号> [发布tag]
-#   例:  scripts/generate_appcast.sh release/appcast-src App 0.1.0 v0.1.0
+# Usage:
+#   scripts/generate_appcast.sh <archives-dir> <app-name> <version> [release-tag]
+#   e.g. scripts/generate_appcast.sh release/appcast-src App 0.1.0 v0.1.0
 #
-# enclosure URL = ${SPARKLE_APPCAST_BASE_URL}/${TAG}/<文件>  （末尾斜杠必须加）
-# 默认 SPARKLE_APPCAST_BASE_URL = https://github.com/SHIINASAMA/pyside-template/releases/download
+# enclosure URL = ${SPARKLE_APPCAST_BASE_URL}/${TAG}/<file> (trailing slash REQUIRED)
+# default SPARKLE_APPCAST_BASE_URL = https://github.com/SHIINASAMA/pyside-template/releases/download
 #
-# 私钥来源（按优先级）:
-#   1. $SPARKLE_PRIVATE_KEY 环境变量：为私钥内容（PEM/base64），会写入临时文件 --ed-key-file
-#   2. $SPARKLE_PRIVATE_KEY 指向一个存在的文件路径
-#   3. 本机 $HOME/.config/pyside-template/sparkle/ed25519_private_key.pem
+# private key source (priority):
+#   1. $SPARKLE_PRIVATE_KEY env var: key content (PEM/base64), written to temp file for --ed-key-file
+#   2. $SPARKLE_PRIVATE_KEY points to an existing file path
+#   3. local $HOME/.config/pyside-template/sparkle/ed25519_private_key.pem
 set -euo pipefail
 
 ARCHIVES_DIR="${1:?Update archives directory required}"
@@ -23,13 +23,13 @@ BASE_URL="${SPARKLE_APPCAST_BASE_URL:-https://github.com/SHIINASAMA/pyside-templ
 TOOLS_CACHE="${HOME}/.cache/pyside-template/sparkle-tools/bin"
 OUT="${ARCHIVES_DIR}/appcast.xml"
 
-# --- 解析私钥 ---
+# --- resolve private key ---
 TMP_KEY=""
 if [ -n "${SPARKLE_PRIVATE_KEY:-}" ]; then
   if [ -f "${SPARKLE_PRIVATE_KEY}" ]; then
     PRIVATE_KEY="${SPARKLE_PRIVATE_KEY}"
   else
-    # 内容是密钥本体（PEM / base64），写入临时文件
+    # key content is the secret itself (PEM/base64); write to temp file
     TMP_KEY="$(mktemp -t sparkle-edkey).pem"
     printf '%s' "${SPARKLE_PRIVATE_KEY}" > "$TMP_KEY"
     PRIVATE_KEY="$TMP_KEY"
@@ -42,16 +42,16 @@ cleanup() { [ -n "${TMP_KEY}" ] && python3 -c "import os; os.unlink('${TMP_KEY}'
 trap cleanup EXIT
 
 if [ ! -f "$PRIVATE_KEY" ]; then
-  echo "私钥不存在: $PRIVATE_KEY  (请设置 SPARKLE_PRIVATE_KEY，或先运行 generate_keys 导出)" >&2
+  echo "private key not found: $PRIVATE_KEY (set SPARKLE_PRIVATE_KEY, or run generate_keys first)" >&2
   exit 1
 fi
 
 download_tools() {
   if [ -x "${TOOLS_CACHE}/generate_appcast" ]; then
-    echo "使用已缓存工具: ${TOOLS_CACHE}/generate_appcast"
+    echo "using cached tool: ${TOOLS_CACHE}/generate_appcast"
     return
   fi
-  echo "下载 Sparkle ${SPARKLE_VERSION} 工具到 ${TOOLS_CACHE} ..."
+  echo "downloading Sparkle ${SPARKLE_VERSION} tools to ${TOOLS_CACHE} ..."
   mkdir -p "${TOOLS_CACHE}"
   tmp_archive="$(mktemp -t sparkle-tools).tar.xz"
   curl -fsSL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" -o "$tmp_archive"
@@ -67,11 +67,11 @@ download_tools
 
 URL_PREFIX="${BASE_URL}/${TAG}/"
 
-echo "生成 appcast（version=${VERSION}, tag=${TAG}, prefix=${URL_PREFIX}）"
+echo "generating appcast (version=${VERSION}, tag=${TAG}, prefix=${URL_PREFIX})"
 "${TOOLS_CACHE}/generate_appcast" \
   --ed-key-file "$PRIVATE_KEY" \
   --download-url-prefix "$URL_PREFIX" \
   -o "$OUT" \
   "$ARCHIVES_DIR"
 
-echo "已生成: $OUT"
+echo "generated: $OUT"

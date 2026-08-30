@@ -35,7 +35,19 @@ _DOWNLOAD_URL_TEMPLATE = (
 
 def _version_marker_path(app_bundle: Path) -> Path:
     """Return the path to the version marker inside the embedded framework."""
-    return app_bundle / "Contents" / "Frameworks" / _SPARKLE_VERSION_MARKER
+    # Store the version marker INSIDE the framework (Resources) so codesign
+    # does not report "unsealed contents present in the root directory of an
+    # embedded framework". A file at the framework root is treated as unsealed.
+    return (
+        app_bundle
+        / "Contents"
+        / "Frameworks"
+        / "Sparkle.framework"
+        / "Versions"
+        / "B"
+        / "Resources"
+        / ".sparkle-version"
+    )
 
 
 def _already_embedded(app_bundle: Path, version: str) -> bool:

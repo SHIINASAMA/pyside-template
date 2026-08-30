@@ -105,6 +105,8 @@ jobs:
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
             IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep -oE '".*"' | head -n1 | tr -d '"')
             echo "Using identity: $IDENTITY"
+            # Export for later steps (dmg signing) so they don't re-resolve an empty identity.
+            echo "SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
             uv run python scripts/codesign_macos.py --app-bundle build/${{ env.APP_NAME }}.app --identity "$IDENTITY" --entitlements scripts/entitlements.plist --verbose
           else
             echo "⚠️  No certificate secret — ad-hoc signing for local Sparkle E2E (Gatekeeper will still reject)"
@@ -121,9 +123,10 @@ jobs:
           xattr -cr build/${{ env.APP_NAME }}.app
           ./build-dmg.sh
           # Sign the DMG itself (wifi-lens: codesign --sign --timestamp --options=runtime)
-          if [ -n "$APPLE_CERTIFICATE_P12_BASE64" ]; then
-            IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep -oE '".*"' | head -n1 | tr -d '"')
-            codesign --force --sign "$IDENTITY" --timestamp --options=runtime "release/${{ env.APP_NAME }}Installer.dmg"
+          if [ -n "$SIGNING_IDENTITY" ]; then
+            codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options=runtime "release/${{ env.APP_NAME }}Installer.dmg"
+          else
+            echo "⚠️  SIGNING_IDENTITY not set — dmg not independently signed"
           fi
           mkdir -p release
           cd build
